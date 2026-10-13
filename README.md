@@ -18,7 +18,7 @@ PolicyPilot is a local AI assistant that answers company policy questions using 
 - ChromaDB
 - Requests
 - Retrieval-Augmented Generation (RAG)
--Streamlit
+- Streamlit
 ## Project Structure
 
 ```text
