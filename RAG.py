@@ -1,4 +1,3 @@
-
 import requests
 import chromadb
 
@@ -38,8 +37,8 @@ embeddings = response.json()["embeddings"]
 collection.add(
     documents=chunks,
     embeddings=embeddings,
-    ids=[f"chunk_{i}" for i in range(len(chunks))]
-)
+    # create a unique ID for each chunk
+    ids=[f"chunk_{i}" for i in range(len(chunks))] )
 
 
 # 6. Retrieve policy evidence and generate an answer
