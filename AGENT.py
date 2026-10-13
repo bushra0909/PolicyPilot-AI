@@ -1,3 +1,4 @@
+
 import json
 import re
 import requests
@@ -53,7 +54,7 @@ User request: {question}
 JSON:
 """
 
-    # A short output limit reduces unnecessary model generation.
+# Send the prompt to Ollama and wait for its response.
     response = session.post(
         OLLAMA_URL,
         json={
@@ -63,35 +64,45 @@ JSON:
             "format": "json",
             "keep_alive": "10m",
             "options": {
-                "temperature": 0,
-                "num_predict": 80
+                "temperature": 0,  # Makes responses more consistent.
+                "num_predict": 80  # Limits the response to about 80 tokens.
             }
         },
-        timeout=(5, 120)
+        timeout=(5, 120)  # 5 seconds to connect, 120 seconds to receive.
     )
 
-    # Raise an error if Ollama returns an unsuccessful HTTP status.
+# Check whether Ollama's API request failed.
     response.raise_for_status()
 
-    # Extract the model's JSON response.
+# Get the text returned by Ollama.
     raw = response.json()["response"]
+
+# Convert the AI's JSON text into a Python dictionary.
     decision = json.loads(raw)
 
+ # Check that the AI returned a dictionary.
     if not isinstance(decision, dict):
         raise ValueError("The agent did not return a JSON object.")
 
+# Send the AI's decision back to the calling code.
     return decision
 
 
-# 4. Validate and execute the selected tool.
+# 4. Check the AI's decision and run the selected tool.
 def execute_tool(decision):
+
+    # Get the name of the tool selected by the AI.
     tool = decision.get("tool")
 
+    # If the AI selected addition or calculation:
     if tool in ("add", "calculate"):
-        # Reject missing or non-numeric arguments.
+
+        # Get the two numbers provided by the AI.
         a = decision.get("a")
         b = decision.get("b")
 
+        # Check that both values are numbers, not missing,
+        # text, or True/False.
         if (
             isinstance(a, bool) or isinstance(b, bool)
             or not isinstance(a, (int, float))
@@ -99,58 +110,86 @@ def execute_tool(decision):
         ):
             raise ValueError("The selected tool needs two numbers.")
 
+        # Run the addition function if the tool is "add".
         if tool == "add":
             return add(a, b), ""
 
+        # Otherwise, run the calculation function.
         return calculate(a, b), ""
 
+    # If the AI selected the company policy search tool:
     if tool == "search_company_policy":
+
+        # Get the question that needs to be answered.
         policy_question = decision.get("question")
 
+        # Check that the question is valid and not empty.
         if not isinstance(policy_question, str) or not policy_question.strip():
             raise ValueError("The policy question is missing.")
 
+        # Search the policy document and return its result.
         return search_company_policy(policy_question), None
 
+    # If the AI selected a tool we don't recognize, show an error.
     raise ValueError("The agent selected an unknown tool.")
 
 
-# 5. Run the assistant and display a clean, user-facing result.
+# 5. Run the assistant and display the final answer.
 def main():
+
+    # Ask the user to enter a question and remove extra spaces.
     question = input("Ask a question: ").strip()
 
+    # If the user entered nothing, show a message and stop.
     if not question:
         print("Please enter a question.")
         return
 
+    # Try to process the question without crashing the program.
     try:
+
+        # Ask the AI to choose which tool should be used.
         decision = choose_tool(question)
+
+        # Check the decision and execute the selected tool.
         result = execute_tool(decision)
 
-        # Policy tools return (answer, evidence); maths tools return a number.
+        # Policy tools return (answer, evidence).
         if decision["tool"] == "search_company_policy":
+
+            # The policy function returns (answer, evidence).
             answer, evidence = result[0]
 
+            # Display the answer.
             print("\nANSWER")
             print(answer)
 
+            # Display evidence only if some was returned.
             if evidence:
                 print("\nSUPPORTING EVIDENCE")
                 print(evidence)
+
         else:
+            # Maths tools return (number, empty string).
             answer, _ = result
 
+            # Display the answer.
             print("\nANSWER")
             print(answer)
 
+    # Show a message if Ollama takes too long to respond.
     except requests.Timeout:
         print("\nThe local AI model took too long to respond. Please try again.")
+
+    # Show a message if Python cannot connect to Ollama.
     except requests.RequestException:
         print("\nCould not connect to the local AI service. Check that Ollama is running.")
+
+    # Show a message if the decision or data is invalid.
     except (ValueError, KeyError, TypeError, json.JSONDecodeError):
         print("\nThe agent could not process this request correctly. Please try again.")
 
 
-# Run only when AG.py is executed directly.
+# Run main() only when this file is executed directly.
 if __name__ == "__main__":
     main()
